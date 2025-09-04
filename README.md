@@ -1,7 +1,7 @@
-🚀 Project Title & Tagline
+🚀 Product Image Downloader
 ============================
 **Google Image Crawler** 🕷️
-_Automate image downloads from Google with ease_
+_Automate bulk image downloads from Google for datasets, research, and ML training
 
 📖 Description
 -------------
