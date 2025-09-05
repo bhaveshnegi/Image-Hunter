@@ -55,9 +55,9 @@ To run the Google Image Crawler, follow these steps:
 3. Create a virtual environment (recommended)
     * python -m venv .venv
     *.venv\Scripts\activate
-    On macOS/Linux:
-    * python3 -m venv .venv
-    * source .venv/bin/activate
+    * On macOS/Linux:
+        * python3 -m venv .venv
+        * source .venv/bin/activate
 4. Install dependencies
     * pip install -r requirements.txt
 
