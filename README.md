@@ -1,4 +1,4 @@
-🚀 Image Hunter
+🆖 Image Hunter
 ============================
 **Google Image Crawler** 🕷️
 _Automate bulk image downloads from Google for datasets, research, and ML training
