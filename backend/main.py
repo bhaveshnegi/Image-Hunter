@@ -28,7 +28,7 @@ def crawl(req: Request):
 
     def done_callback():
         JOBS[uid]["status"] = "done"
-        JOBS[uid]["msg"] = f"Downloaded images into {output_dir}"
+        JOBS[uid]["msg"] = "Downloaded images"
 
     def error_callback(msg):
         JOBS[uid]["status"] = "error"
@@ -62,7 +62,8 @@ def download(job_id: str):
     zip_path = f"images/{job_id}.zip"
     if not os.path.exists(f"images/{job_id}"):
         raise HTTPException(404, "images folder missing")
-    shutil.make_archive(f"images/{job_id}", "zip", f"images/{job_id}")
+    if not os.path.exists(zip_path):               # create only once
+        shutil.make_archive(f"images/{job_id}", "zip", f"images/{job_id}")
     return {"url": f"/static/{job_id}.zip"}
 
 # serve zipped file

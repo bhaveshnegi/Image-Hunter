@@ -1,12 +1,15 @@
 import { useState } from "react";
-import { crawl, getStatus } from "./api";
+import { Search, Download, Sparkles, ArrowRight, CheckCircle2 } from "lucide-react";
+import { crawl, getStatus, getDownloadLink } from "./api.js";   // new file shown below
+import "./App.css";
 
 function App() {
-  const [kw, setKw]   = useState("");
+  const [kw, setKw] = useState("");
   const [max, setMax] = useState(50);
   const [jobId, setJobId] = useState(null);
   const [status, setStatus] = useState({});
   const [loading, setLoading] = useState(false);
+  const [focusedInput, setFocusedInput] = useState(null);
 
   const start = async () => {
     setLoading(true);
@@ -15,53 +18,130 @@ function App() {
     const t = setInterval(async () => {
       const s = await getStatus(job_id);
       setStatus(s);
-      if (s.status !== "running") { clearInterval(t); setLoading(false); }
+      if (s.status !== "running") { 
+        clearInterval(t); 
+        setLoading(false); 
+      }
     }, 1000);
   };
 
-  return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-      <div className="bg-white rounded shadow p-8 w-full max-w-md space-y-4">
-        <h1 className="text-2xl font-bold">Image Crawler</h1>
-        <input
-          className="w-full border px-3 py-2 rounded"
-          placeholder="Keyword (e.g. Nike shoes)"
-          value={kw}
-          onChange={(e) => setKw(e.target.value)}
-        />
-        <input
-          type="number"
-          className="w-full border px-3 py-2 rounded"
-          value={max}
-          onChange={(e) => setMax(Number(e.target.value))}
-          min="1"
-          max="1000"
-        />
-        <button
-          onClick={start}
-          disabled={loading || !kw}
-          className="w-full bg-blue-600 text-white py-2 rounded disabled:opacity-50"
-        >
-          {loading ? "Crawling…" : "Start"}
-        </button>
+  const handleDownload = async () => {
+  try {
+    const url = await getDownloadLink(jobId);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${jobId}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } catch (e) {
+    alert("Download link not ready yet");
+  }
+};
 
+  const canStart = kw.trim() && !loading;
+
+  return (
+    <div className="app-container">
+      <div className="card-wrapper">
+        
+        {/* Header */}
+        <div className="header">
+          <div className="header-icon">
+            <Sparkles className="icon" />
+          </div>
+          <h1>Image Hunter</h1>
+          <p>Find and collect images from across the web</p>
+        </div>
+
+        {/* Form Card */}
+        <div className="card">
+          <div className="form-group">
+            <label className={focusedInput === 'keyword' || kw ? "label focused" : "label"}>
+              What would you like to find?
+            </label>
+            <input
+              type="text"
+              value={kw}
+              onChange={(e) => setKw(e.target.value)}
+              onFocus={() => setFocusedInput('keyword')}
+              onBlur={() => setFocusedInput(null)}
+            />
+            <Search className="input-icon" />
+          </div>
+
+          <div className="form-group">
+            <label className={focusedInput === 'max' || max ? "label focused" : "label"}>
+              Maximum images
+            </label>
+            <input
+              type="number"
+              value={max}
+              onChange={(e) => setMax(Number(e.target.value))}
+              onFocus={() => setFocusedInput('max')}
+              onBlur={() => setFocusedInput(null)}
+              min="1"
+              max="1000"
+            />
+            <div className="input-emoji">
+              {max > 100 ? '🔥' : max > 50 ? '⚡' : '📱'}
+            </div>
+          </div>
+
+          <button
+            onClick={start}
+            disabled={!canStart}
+            className={canStart ? "btn" : "btn disabled"}
+          >
+            {loading ? (
+              <>
+                <div className="spinner"></div>
+                <span>Hunting images...</span>
+              </>
+            ) : (
+              <>
+                <span>Start Hunt</span>
+                <ArrowRight className="arrow" />
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Status Card */}
         {status.status && (
-          <div className="text-sm">
-            Status: <span className="font-semibold">{status.status}</span>
-            {status.msg && <p className="text-gray-600">{status.msg}</p>}
+          <div className="card status-card">
+            <div className="status-row">
+              <div className={`status-dot ${status.status}`}></div>
+              <div className="status-text">
+                <span>Status: <strong>{status.status}</strong></span>
+                {status.msg && <p>{status.msg}</p>}
+              </div>
+            </div>
+
+            {status.status === "running" && (
+              <div className="progress-bar">
+                <div className="progress"></div>
+              </div>
+            )}
+
             {status.status === "done" && (
-              <a
-                className="text-blue-600 underline block mt-2"
-                href={`http://localhost:8000/static/${jobId}.zip`}
-                download
-              >
-                ⬇ Download ZIP
-              </a>
+              <div className="success">
+                <CheckCircle2 className="success-icon" />
+                <button onClick={handleDownload} className="btn success-btn">
+                  <Download /> Download Collection
+                </button>
+              </div>
             )}
           </div>
         )}
+
+        {/* Footer */}
+        <div className="footer">
+          <p>Discover • Collect • Download</p>
+        </div>
       </div>
     </div>
   );
 }
+
 export default App;
