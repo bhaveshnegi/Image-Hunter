@@ -1,3 +1,4 @@
 .downloadenv/
 __pycache__/
-images/
+
+.backendenv/
