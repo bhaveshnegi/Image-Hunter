@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Search, Download, Sparkles, ArrowRight, CheckCircle2 } from "lucide-react";
-import { crawl, getStatus, getDownloadLink } from "./api.js";   // new file shown below
+import { crawl, getStatus, getDownloadLink, uploadCrawl  } from "./api.js";   // new file shown below
 import "./App.css";
 
 function App() {
@@ -39,6 +39,19 @@ function App() {
   }
 };
 
+const handleUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setLoading(true);
+    const { job_id } = await uploadCrawl(file, max);
+    setJobId(job_id);
+    const t = setInterval(async () => {
+      const s = await getStatus(job_id);
+      setStatus(s);
+      if (s.status !== "running") { clearInterval(t); setLoading(false); }
+    }, 1000);
+  };
+
   const canStart = kw.trim() && !loading;
 
   return (
@@ -55,60 +68,81 @@ function App() {
         </div>
 
         {/* Form Card */}
-        <div className="card">
-          <div className="form-group">
-            <label className={focusedInput === 'keyword' || kw ? "label focused" : "label"}>
-              What would you like to find?
-            </label>
-            <input
-              type="text"
-              value={kw}
-              onChange={(e) => setKw(e.target.value)}
-              onFocus={() => setFocusedInput('keyword')}
-              onBlur={() => setFocusedInput(null)}
-            />
-            <Search className="input-icon" />
-          </div>
+{/* Form Card */}
+<div className="card">
+  {/* ----- TEXT SEARCH (unchanged) ----- */}
+  <div className="form-group">
+    <label className={focusedInput === 'keyword' || kw ? "label focused" : "label"}>
+      What would you like to find?
+    </label>
+    <input
+      type="text"
+      value={kw}
+      onChange={(e) => setKw(e.target.value)}
+      onFocus={() => setFocusedInput('keyword')}
+      onBlur={() => setFocusedInput(null)}
+    />
+    <Search className="input-icon" />
+  </div>
 
-          <div className="form-group">
-            <label className={focusedInput === 'max' || max ? "label focused" : "label"}>
-              Maximum images 500
-            </label>
-            <input
-              type="number"
-              value={max}
-              onChange={(e) => {
-                const v = Math.min(Number(e.target.value), 500); // clamp to 500
-                setMax(v);
-              }}
-              onFocus={() => setFocusedInput('max')}
-              onBlur={() => setFocusedInput(null)}
-              min="1"
-              max="500"          // hard browser cap
-            />
-            <div className="input-emoji">
-              {max > 100 ? '🔥' : max > 50 ? '⚡' : '📱'}
-            </div>
-          </div>
+  {/* ----- OR divider ----- */}
+  <div className="divider">
+    <span>or</span>
+  </div>
 
-          <button
-            onClick={start}
-            disabled={!canStart}
-            className={canStart ? "btn" : "btn disabled"}
-          >
-            {loading ? (
-              <>
-                <div className="spinner"></div>
-                <span>Hunting images...</span>
-              </>
-            ) : (
-              <>
-                <span>Start Hunt</span>
-                <ArrowRight className="arrow" />
-              </>
-            )}
-          </button>
-        </div>
+  {/* ----- UPLOAD SEARCH (new) ----- */}
+  <div className="form-group upload-group">
+    <input
+      type="file"
+      accept="image/*"
+      id="upload-input"
+      style={{ display: "none" }}
+      onChange={handleUpload}
+    />
+    <label htmlFor="upload-input" className="upload-label">
+      <Sparkles className="upload-icon" />
+      <span>Upload an image to find similar ones</span>
+    </label>
+  </div>
+
+  {/* ----- shared max slider ----- */}
+  <div className="form-group">
+    <label className={focusedInput === 'max' || max ? "label focused" : "label"}>
+      Maximum images 500
+    </label>
+    <input
+      type="number"
+      value={max}
+      onChange={(e) => setMax(Math.min(Number(e.target.value), 500))}
+      onFocus={() => setFocusedInput('max')}
+      onBlur={() => setFocusedInput(null)}
+      min="1"
+      max="500"
+    />
+    <div className="input-emoji">
+      {max > 100 ? '🔥' : max > 50 ? '⚡' : '📱'}
+    </div>
+  </div>
+
+  {/* ----- start button (unchanged) ----- */}
+  <button
+    onClick={start}
+    disabled={!canStart}
+    className={canStart ? "btn" : "btn disabled"}
+  >
+    {loading ? (
+      <>
+        <div className="spinner"></div>
+        <span>Hunting images...</span>
+      </>
+    ) : (
+      <>
+        <span>Start Hunt</span>
+        <ArrowRight className="arrow" />
+      </>
+    )}
+  </button>
+</div>
 
         {/* Status Card */}
         {status.status && (

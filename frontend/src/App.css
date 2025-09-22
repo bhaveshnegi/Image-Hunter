@@ -222,3 +222,20 @@ body, html, #root {
   font-size: 12px;
   color: #9ca3af;
 }
+
+.divider{
+  text-align:center; margin:12px 0; font-size:13px; color:#888; position:relative;
+}
+.divider::before,
+.divider::after{
+  content:""; height:1px; background:#ddd; width:40%; position:absolute; top:50%;
+}
+.divider::before{left:0;}
+.divider::after{right:0;}
+
+.upload-label{
+  display:flex; align-items:center; gap:8px; padding:10px 14px;
+  border:1px dashed #999; border-radius:8px; cursor:pointer; transition:.2s;
+}
+.upload-label:hover{border-color:#6366f1; background:#f3f4ff;}
+.upload-icon{width:18px; color:#6366f1;}
