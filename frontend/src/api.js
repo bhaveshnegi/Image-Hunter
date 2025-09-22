@@ -1,4 +1,4 @@
-const BASE = "https://image-hunter.onrender.com";
+const BASE = "https://image-hunter-1.onrender.com";
 
 export async function crawl(body) {
   const r = await fetch(`${BASE}/crawl`, {
