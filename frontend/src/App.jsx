@@ -1,15 +1,16 @@
 import { useState } from "react";
-import { Search, Download, Sparkles, ArrowRight, CheckCircle2 } from "lucide-react";
-import { crawl, getStatus, getDownloadLink, uploadCrawl  } from "./api.js";   // new file shown below
+import { Search, Download, Sparkles, ArrowRight, CheckCircle2, Upload, Image, Zap } from "lucide-react";
+import { crawl, getStatus, getDownloadLink, uploadCrawl } from "./api.js";
 import "./App.css";
 
 function App() {
   const [kw, setKw] = useState("");
-  const [max, setMax] = useState(1);
+  const [max, setMax] = useState(50);
   const [jobId, setJobId] = useState(null);
   const [status, setStatus] = useState({});
   const [loading, setLoading] = useState(false);
   const [focusedInput, setFocusedInput] = useState(null);
+  const [searchMode, setSearchMode] = useState('text'); // 'text' or 'upload'
 
   const start = async () => {
     setLoading(true);
@@ -18,31 +19,32 @@ function App() {
     const t = setInterval(async () => {
       const s = await getStatus(job_id);
       setStatus(s);
-      if (s.status !== "running") { 
-        clearInterval(t); 
-        setLoading(false); 
+      if (s.status !== "running") {
+        clearInterval(t);
+        setLoading(false);
       }
     }, 1000);
   };
 
   const handleDownload = async () => {
-  try {
-    const url = await getDownloadLink(jobId);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${jobId}.zip`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  } catch (e) {
-    alert("Download link not ready yet");
-  }
-};
+    try {
+      const url = await getDownloadLink(jobId);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${jobId}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (e) {
+      alert("Download link not ready yet");
+    }
+  };
 
-const handleUpload = async (e) => {
+  const handleUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     setLoading(true);
+    setSearchMode('upload');
     const { job_id } = await uploadCrawl(file, max);
     setJobId(job_id);
     const t = setInterval(async () => {
@@ -52,120 +54,156 @@ const handleUpload = async (e) => {
     }, 1000);
   };
 
-  const canStart = kw.trim() && !loading;
+  const canStart = (searchMode === 'text' ? kw.trim() : true) && !loading;
 
   return (
     <div className="app-container">
-      <div className="card-wrapper">
-        
-        {/* Header */}
-        <div className="header">
+      <div className="content-wrapper">
+
+        {/* Floating Header */}
+        <div className="header animate-fadeIn">
           <div className="header-icon">
-            <Sparkles className="icon" />
+            <Sparkles className="header-icon-sparkles" />
           </div>
-          <h1>Image Hunter</h1>
-          <p>Find and collect images from across the web</p>
+          <h1 className="header-title">
+            Image Hunter
+          </h1>
+          <p className="header-subtitle">
+            Discover amazing images across the web ✨
+          </p>
         </div>
 
-        {/* Form Card */}
-{/* Form Card */}
-<div className="card">
-  {/* ----- TEXT SEARCH (unchanged) ----- */}
-  <div className="form-group">
-    <label className={focusedInput === 'keyword' || kw ? "label focused" : "label"}>
-      What would you like to find?
-    </label>
-    <input
-      type="text"
-      value={kw}
-      onChange={(e) => setKw(e.target.value)}
-      onFocus={() => setFocusedInput('keyword')}
-      onBlur={() => setFocusedInput(null)}
-    />
-    <Search className="input-icon" />
-  </div>
+        {/* Main Search Card */}
+        <div className="main-card">
 
-  {/* ----- OR divider ----- */}
-  <div className="divider">
-    <span>or</span>
-  </div>
+          {/* Search Mode Toggle */}
+          <div className="mode-toggle">
+            <button
+              onClick={() => setSearchMode('text')}
+              className={`mode-btn ${searchMode === 'text' ? 'mode-btn-active' : ''}`}
+            >
+              <Search className="mode-icon" />
+              Text Search
+            </button>
+            <button
+              onClick={() => setSearchMode('upload')}
+              className={`mode-btn ${searchMode === 'upload' ? 'mode-btn-active mode-btn-upload' : ''}`}
+            >
+              <Upload className="mode-icon" />
+              Image Upload
+            </button>
+          </div>
 
-  {/* ----- UPLOAD SEARCH (new) ----- */}
-  <div className="form-group upload-group">
-    <input
-      type="file"
-      accept="image/*"
-      id="upload-input"
-      style={{ display: "none" }}
-      onChange={handleUpload}
-    />
-    <label htmlFor="upload-input" className="upload-label">
-      <Sparkles className="upload-icon" />
-      <span>Upload an image to find similar ones</span>
-    </label>
-  </div>
+          {/* Text Search */}
+          {searchMode === 'text' && (
+            <div className="search-section animate-slideIn">
+              <div className="input-group">
+                <div className={`input-glow ${focusedInput === 'keyword' ? 'input-glow-active' : ''}`}></div>
+                <div className="input-wrapper">
+                  <input
+                    type="text"
+                    value={kw}
+                    onChange={(e) => setKw(e.target.value)}
+                    onFocus={() => setFocusedInput('keyword')}
+                    onBlur={() => setFocusedInput(null)}
+                    placeholder="What images are you looking for?"
+                    className="text-input"
+                  />
+                  <Search className="input-icon" />
+                </div>
+              </div>
+            </div>
+          )}
 
-  {/* ----- shared max slider ----- */}
-  <div className="form-group">
-    <label className={focusedInput === 'max' || max ? "label focused" : "label"}>
-      Maximum images 500
-    </label>
-    <input
-      type="number"
-      value={max}
-      onChange={(e) => setMax(Math.min(Number(e.target.value), 500))}
-      onFocus={() => setFocusedInput('max')}
-      onBlur={() => setFocusedInput(null)}
-      min="1"
-      max="500"
-    />
-    <div className="input-emoji">
-      {max > 100 ? '🔥' : max > 50 ? '⚡' : '📱'}
-    </div>
-  </div>
+          {/* Upload Search */}
+          {searchMode === 'upload' && (
+            <div className="upload-section animate-slideIn">
+              <input
+                type="file"
+                accept="image/*"
+                id="upload-input"
+                className="upload-input-hidden"
+                onChange={handleUpload}
+              />
+              <label htmlFor="upload-input" className="upload-label">
+                <div className="upload-icon-wrapper">
+                  <Image className="upload-icon" />
+                </div>
+                <p className="upload-title">Upload an image</p>
+                <p className="upload-subtitle">
+                  Find similar images across the web
+                </p>
+              </label>
+            </div>
+          )}
+          <div className="form-group">
+            <label className={focusedInput === 'max' || max ? "label focused" : "label"}>
+              Maximum images 500
+            </label>
+            <input
+              type="number"
+              value={max}
+              onChange={(e) => setMax(Math.min(Number(e.target.value), 500))}
+              onFocus={() => setFocusedInput('max')}
+              onBlur={() => setFocusedInput(null)}
+              min="1"
+              max="500"
+            />
+            <div className="input-emoji">
+              {max > 100 ? '🔥' : max > 50 ? '⚡' : '📱'}
+            </div>
+          </div>
 
-  {/* ----- start button (unchanged) ----- */}
-  <button
-    onClick={start}
-    disabled={!canStart}
-    className={canStart ? "btn" : "btn disabled"}
-  >
-    {loading ? (
-      <>
-        <div className="spinner"></div>
-        <span>Hunting images...</span>
-      </>
-    ) : (
-      <>
-        <span>Start Hunt</span>
-        <ArrowRight className="arrow" />
-      </>
-    )}
-  </button>
-</div>
+          {/* Action Button */}
+          <button
+            onClick={start}
+            disabled={!canStart}
+            className={`action-btn ${canStart ? 'action-btn-active' : 'action-btn-disabled'}`}
+          >
+            {loading ? (
+              <div className="loading-content">
+                <div className="spinner"></div>
+                <span>Hunting Images...</span>
+              </div>
+            ) : (
+              <div className="button-content">
+                <span>Start Hunt</span>
+                <ArrowRight className="arrow-icon" />
+              </div>
+            )}
+          </button>
+        </div>
 
         {/* Status Card */}
         {status.status && (
-          <div className="card status-card">
-            <div className="status-row">
+          <div className="status-card animate-slideUp">
+            <div className="status-header">
               <div className={`status-dot ${status.status}`}></div>
               <div className="status-text">
-                <span>Status: <strong>{status.status}</strong></span>
-                {status.msg && <p>{status.msg}</p>}
+                <p className="status-title">
+                  Status: {status.status}
+                </p>
+                {status.msg && (
+                  <p className="status-message">{status.msg}</p>
+                )}
               </div>
             </div>
 
             {status.status === "running" && (
               <div className="progress-bar">
-                <div className="progress"></div>
+                <div className="progress-fill"></div>
               </div>
             )}
 
             {status.status === "done" && (
-              <div className="success">
+              <div className="success-section">
                 <CheckCircle2 className="success-icon" />
-                <button onClick={handleDownload} className="btn success-btn">
-                  <Download /> Download Collection
+                <button
+                  onClick={handleDownload}
+                  className="download-btn"
+                >
+                  <Download className="download-icon" />
+                  Download Collection
                 </button>
               </div>
             )}
@@ -174,7 +212,13 @@ const handleUpload = async (e) => {
 
         {/* Footer */}
         <div className="footer">
-          <p>Discover • Collect • Download</p>
+          <p className="footer-content">
+            <span>Discover</span>
+            <span className="footer-dot"></span>
+            <span>Collect</span>
+            <span className="footer-dot"></span>
+            <span>Download</span>
+          </p>
         </div>
       </div>
     </div>
