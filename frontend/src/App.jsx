@@ -18,33 +18,33 @@ function App() {
     const t = setInterval(async () => {
       const s = await getStatus(job_id);
       setStatus(s);
-      if (s.status !== "running") {
-        clearInterval(t);
-        setLoading(false);
+      if (s.status !== "running") { 
+        clearInterval(t); 
+        setLoading(false); 
       }
     }, 1000);
   };
 
   const handleDownload = async () => {
-    try {
-      const url = await getDownloadLink(jobId);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${jobId}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    } catch (e) {
-      alert("Download link not ready yet");
-    }
-  };
+  try {
+    const url = await getDownloadLink(jobId);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${jobId}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } catch (e) {
+    alert("Download link not ready yet");
+  }
+};
 
   const canStart = kw.trim() && !loading;
 
   return (
     <div className="app-container">
       <div className="card-wrapper">
-
+        
         {/* Header */}
         <div className="header">
           <div className="header-icon">
@@ -61,16 +61,11 @@ function App() {
               What would you like to find?
             </label>
             <input
-              type="number"
-              value={max}
-              onChange={(e) => {
-                const v = Math.min(Number(e.target.value), 500); // clamp to 500
-                setMax(v);
-              }}
-              onFocus={() => setFocusedInput('max')}
+              type="text"
+              value={kw}
+              onChange={(e) => setKw(e.target.value)}
+              onFocus={() => setFocusedInput('keyword')}
               onBlur={() => setFocusedInput(null)}
-              min="1"
-              max="500"          // hard browser cap
             />
             <Search className="input-icon" />
           </div>
@@ -82,11 +77,14 @@ function App() {
             <input
               type="number"
               value={max}
-              onChange={(e) => setMax(Number(e.target.value))}
+              onChange={(e) => {
+                const v = Math.min(Number(e.target.value), 500); // clamp to 500
+                setMax(v);
+              }}
               onFocus={() => setFocusedInput('max')}
               onBlur={() => setFocusedInput(null)}
               min="1"
-              max="1000"
+              max="500"          // hard browser cap
             />
             <div className="input-emoji">
               {max > 100 ? '🔥' : max > 50 ? '⚡' : '📱'}
