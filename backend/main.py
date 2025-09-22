@@ -8,11 +8,11 @@ from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 load_dotenv()          # <-- pulls everything in .env into os.environ
 
-PEXELS_KEY = os.getenv("PEXELS_API_KEY")          # <-- put your key here
-if not PEXELS_KEY:
-    raise RuntimeError("Env-var PEXELS_API_KEY required")
+PIXABAY_KEY = os.getenv("PIXABAY_API_KEY")          # <-- put your key here
+if not PIXABAY_KEY:
+    raise RuntimeError("Env-var PIXABAY_API_KEY required")
 
-PEXELS_ROOT = "https://api.pexels.com/v1/search"
+PIXABAY_ROOT = "https://pixabay.com/api/"
 
 app = FastAPI()
 app.add_middleware(
@@ -38,32 +38,37 @@ async def _download_one(url: str, path: str, client: httpx.AsyncClient):
                 await fh.write(chunk)
 
 
-async def _pexels_crawl_job(uid: str, keyword: str, max_num: int):
+async def _pixabay_crawl_job(uid: str, keyword: str, max_num: int):
     output_dir = f"images/{uid}"
     os.makedirs(output_dir, exist_ok=True)
 
-    headers = {"Authorization": PEXELS_KEY}
-    per_page = min(80, max_num)          # Pexels allows max 80 per request
+    params = {
+        "key": PIXABAY_KEY,
+        "q": keyword,
+        "image_type": "photo",
+        "per_page": 200,          # max allowed by Pixabay
+        "safesearch": "true",
+    }
     downloaded = 0
     page = 1
 
     async with httpx.AsyncClient(timeout=30) as client:
         while downloaded < max_num:
-            params = {"query": keyword, "per_page": per_page, "page": page}
-            r = await client.get(PEXELS_ROOT, headers=headers, params=params)
+            params["page"] = page
+            r = await client.get(PIXABAY_ROOT, params=params)
             if r.status_code != 200:
-                JOBS[uid].update(status="error", msg=f"Pexels API error {r.status_code}")
+                JOBS[uid].update(status="error", msg=f"Pixabay API error {r.status_code}")
                 return
             data = r.json()
-            photos = data.get("photos", [])
-            if not photos:
+            hits = data.get("hits", [])
+            if not hits:
                 break
 
             tasks = []
-            for photo in photos:
+            for hit in hits:
                 if downloaded >= max_num:
                     break
-                url = photo["src"]["original"]          # pick any size you prefer
+                url = hit["largeImageURL"]          # or webformatURL / previewURL
                 ext = url.split("?")[0].split(".")[-1] or "jpg"
                 tasks.append(
                     _download_one(url, f"{output_dir}/{downloaded:03d}.{ext}", client)
@@ -77,11 +82,15 @@ async def _pexels_crawl_job(uid: str, keyword: str, max_num: int):
 
 
 @app.post("/crawl")
-def crawl(req: Request, bg: BackgroundTasks):
+async def crawl(req: Request):
     uid = str(uuid.uuid4())
     JOBS[uid] = {"status": "running", "msg": ""}
-    bg.add_task(_pexels_crawl_job, uid, req.keyword, req.max_num)
+    try:
+        await _pixabay_crawl_job(uid, req.keyword, req.max_num)
+    except Exception as exc:
+        JOBS[uid].update(status="error", msg=str(exc))
     return {"job_id": uid}
+
 
 @app.get("/status/{job_id}")
 def status(job_id: str):
