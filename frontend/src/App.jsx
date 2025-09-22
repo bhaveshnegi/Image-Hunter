@@ -5,7 +5,7 @@ import "./App.css";
 
 function App() {
   const [kw, setKw] = useState("");
-  const [max, setMax] = useState(50);
+  const [max, setMax] = useState(1);
   const [jobId, setJobId] = useState(null);
   const [status, setStatus] = useState({});
   const [loading, setLoading] = useState(false);
@@ -72,7 +72,7 @@ function App() {
 
           <div className="form-group">
             <label className={focusedInput === 'max' || max ? "label focused" : "label"}>
-              Maximum images
+              Maximum images 500
             </label>
             <input
               type="number"
