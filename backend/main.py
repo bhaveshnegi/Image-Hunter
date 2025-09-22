@@ -1,54 +1,86 @@
-import uuid, os, shutil
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+import asyncio, httpx, uuid, os, shutil, aiofiles
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel
-from icrawler.builtin import GoogleImageCrawler
+from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware   # <-- add this line
+# serve zipped file
+from fastapi.staticfiles import StaticFiles
+from dotenv import load_dotenv
+load_dotenv()          # <-- pulls everything in .env into os.environ
+
+PEXELS_KEY = os.getenv("PEXELS_API_KEY")          # <-- put your key here
+if not PEXELS_KEY:
+    raise RuntimeError("Env-var PEXELS_API_KEY required")
+
+PEXELS_ROOT = "https://api.pexels.com/v1/search"
 
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://image-hunter-khaki.vercel.app"],  # Vite default
+    allow_origins=["https://image-hunter-khaki.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-JOBS = {}   # tiny in-memory store (uuid -> status)
+JOBS = {}  
 
 class Request(BaseModel):
     keyword: str
     max_num: int = 50
 
-@app.post("/crawl")
-def crawl(req: Request):
-    uid = str(uuid.uuid4())
-    JOBS[uid] = {"status": "running", "msg": ""}
+
+async def _download_one(url: str, path: str, client: httpx.AsyncClient):
+    async with client.stream("GET", url) as resp:
+        resp.raise_for_status()
+        async with aiofiles.open(path, "wb") as fh:
+            async for chunk in resp.aiter_bytes():
+                await fh.write(chunk)
+
+
+async def _pexels_crawl_job(uid: str, keyword: str, max_num: int):
     output_dir = f"images/{uid}"
     os.makedirs(output_dir, exist_ok=True)
 
-    def done_callback():
-        JOBS[uid]["status"] = "done"
-        JOBS[uid]["msg"] = "Downloaded images"
+    headers = {"Authorization": PEXELS_KEY}
+    per_page = min(80, max_num)          # Pexels allows max 80 per request
+    downloaded = 0
+    page = 1
 
-    def error_callback(msg):
-        JOBS[uid]["status"] = "error"
-        JOBS[uid]["msg"] = msg
+    async with httpx.AsyncClient(timeout=30) as client:
+        while downloaded < max_num:
+            params = {"query": keyword, "per_page": per_page, "page": page}
+            r = await client.get(PEXELS_ROOT, headers=headers, params=params)
+            if r.status_code != 200:
+                JOBS[uid].update(status="error", msg=f"Pexels API error {r.status_code}")
+                return
+            data = r.json()
+            photos = data.get("photos", [])
+            if not photos:
+                break
 
-    try:
-        crawler = GoogleImageCrawler(
-            storage={"root_dir": output_dir},
-            log_level=20,   # INFO
-        )
-        crawler.crawl(
-            keyword=req.keyword,
-            max_num=req.max_num,
-            file_idx_offset="auto",
-            max_size=None,
-            min_size=(64, 64),
-        )
-        done_callback()
-    except Exception as e:
-        error_callback(str(e))
+            tasks = []
+            for photo in photos:
+                if downloaded >= max_num:
+                    break
+                url = photo["src"]["original"]          # pick any size you prefer
+                ext = url.split("?")[0].split(".")[-1] or "jpg"
+                tasks.append(
+                    _download_one(url, f"{output_dir}/{downloaded:03d}.{ext}", client)
+                )
+                downloaded += 1
+
+            await asyncio.gather(*tasks)
+            page += 1
+
+    JOBS[uid].update(status="done", msg="Downloaded images")
+
+
+@app.post("/crawl")
+def crawl(req: Request, bg: BackgroundTasks):
+    uid = str(uuid.uuid4())
+    JOBS[uid] = {"status": "running", "msg": ""}
+    bg.add_task(_pexels_crawl_job, uid, req.keyword, req.max_num)
     return {"job_id": uid}
 
 @app.get("/status/{job_id}")
@@ -66,6 +98,5 @@ def download(job_id: str):
         shutil.make_archive(f"images/{job_id}", "zip", f"images/{job_id}")
     return {"url": f"/static/{job_id}.zip"}
 
-# serve zipped file
-from fastapi.staticfiles import StaticFiles
+
 app.mount("/static", StaticFiles(directory="images"), name="static")

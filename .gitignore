@@ -1,4 +1,4 @@
 .downloadenv/
 __pycache__/
-
+.env
 .backendenv/
