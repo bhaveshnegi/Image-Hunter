@@ -19,8 +19,8 @@ HF_URL = "https://api-inference.huggingface.co/models/Salesforce/blip-image-capt
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    # allow_origins=["https://image-hunter-khaki.vercel.app"],
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["https://image-hunter-khaki.vercel.app"],
+    # allow_origins=["http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
