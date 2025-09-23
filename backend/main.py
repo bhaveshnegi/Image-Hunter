@@ -9,14 +9,18 @@ from fastapi import UploadFile
 import base64, io, requests
 from PIL import Image
 from fastapi import Form
+from keywords import image_to_keywords
+from keywords import extract_keywords
+import json
+
 
 HF_URL = "https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-base"
 
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://image-hunter-khaki.vercel.app"],
-    # allow_origins=["http://localhost:5173"],
+    # allow_origins=["https://image-hunter-khaki.vercel.app"],
+    allow_origins=["http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -24,24 +28,24 @@ app.add_middleware(
 
 JOBS = {}   # tiny in-memory store (uuid -> status)
 
-def image_to_keywords(pil_image: Image.Image) -> str:
-    try:
-        buf = io.BytesIO()
-        pil_image.save(buf, format="JPEG")
-        b64 = base64.b64encode(buf.getvalue()).decode()
+# def image_to_keywords(pil_image: Image.Image) -> str:
+#     try:
+#         buf = io.BytesIO()
+#         pil_image.save(buf, format="JPEG")
+#         b64 = base64.b64encode(buf.getvalue()).decode()
 
-        r = requests.post(
-            "https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-base",
-            headers={"Authorization": "Bearer hf_PublicApi"},
-            json={"inputs": {"image": b64}},
-            timeout=20,
-        )
-        r.raise_for_status()
-        caption = r.json()[0]["generated_text"]
-        return caption or "popular"          # never empty
-    except Exception as e:
-        print("caption failed:", e)          # stays in server log
-        return "popular"                     # fallback keyword
+#         r = requests.post(
+#             "https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-base",
+#             headers={"Authorization": "Bearer hf_PublicApi"},
+#             json={"inputs": {"image": b64}},
+#             timeout=20,
+#         )
+#         r.raise_for_status()
+#         caption = r.json()[0]["generated_text"]
+#         return caption or "popular"          # never empty
+#     except Exception as e:
+#         print("caption failed:", e)          # stays in server log
+#         return "popular"                     # fallback keyword
 
 # ------------------------------------------------------------------
 # 2.  FastAPI endpoint
@@ -57,20 +61,24 @@ class Request(BaseModel):
 def crawl_by_upload(file: UploadFile, max_num: int = Form(50)):
     max_num = min(max_num, 200)
 
-    # 1. validate image
     try:
         pil_image = Image.open(file.file)
     except Exception:
         raise HTTPException(400, "Invalid image file")
 
-    # 2. generate keywords
-    try:
-        keyword = image_to_keywords(pil_image)
-    except Exception as e:
-        raise HTTPException(502, f"Caption model failed: {e}")
+    # keyword extraction with details
+    kw = extract_keywords(pil_image)
 
-    # 3. hand-off to the *existing* keyword pipeline
-    return crawl(Request(keyword=keyword, max_num=min(max_num, 200)))
+    # log the keywords alongside the job
+    uid = str(uuid.uuid4())
+    output_dir = f"images/{uid}"
+    os.makedirs(output_dir, exist_ok=True)
+
+    with open(f"{output_dir}/keywords.json", "w", encoding="utf-8") as f:
+        json.dump(kw, f, ensure_ascii=False, indent=2)
+
+    # now run the crawler with that query
+    return crawl(Request(keyword=kw["query"], max_num=max_num))
 
 @app.post("/crawl")
 def crawl(req: Request):

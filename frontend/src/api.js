@@ -1,5 +1,5 @@
-const BASE = "https://image-hunter.onrender.com";
-// const BASE = "http://localhost:8000";
+// const BASE = "https://image-hunter.onrender.com";
+const BASE = "http://localhost:8000";
 
 // append to api.js
 export async function uploadCrawl(file, max_num = 50){
