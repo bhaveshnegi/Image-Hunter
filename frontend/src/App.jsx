@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState,useEffect } from "react";
 import { Search, Download, Sparkles, ArrowRight, CheckCircle2, Upload, Image, Zap } from "lucide-react";
 import { crawl, getStatus, getDownloadLink, uploadCrawl } from "./api.js";
 import "./App.css";
+
 
 function App() {
   const [kw, setKw] = useState("");
@@ -11,20 +12,29 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [focusedInput, setFocusedInput] = useState(null);
   const [searchMode, setSearchMode] = useState('text'); // 'text' or 'upload'
+  const [uploadFile, setUploadFile] = useState(null);   // <- NEW
 
-  const start = async () => {
-    setLoading(true);
-    const { job_id } = await crawl({ keyword: kw, max_num: max });
-    setJobId(job_id);
-    const t = setInterval(async () => {
-      const s = await getStatus(job_id);
-      setStatus(s);
-      if (s.status !== "running") {
-        clearInterval(t);
-        setLoading(false);
-      }
-    }, 1000);
-  };
+const start = async () => {
+  setLoading(true);
+  let job;
+  if (searchMode === 'text') {
+    job = await crawl({ keyword: kw, max_num: max });
+  } else {
+    // upload mode – we already have the file
+    job = await uploadCrawl(uploadFile, max);
+  }
+
+  const { job_id } = job;
+  setJobId(job_id);
+  const t = setInterval(async () => {
+    const s = await getStatus(job_id);
+    setStatus(s);
+    if (s.status !== 'running') {
+      clearInterval(t);
+      setLoading(false);
+    }
+  }, 1000);
+};
 
   const handleDownload = async () => {
     try {
@@ -41,20 +51,38 @@ function App() {
   };
 
   const handleUpload = async (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (!file) return;
-    setLoading(true);
+    setUploadFile(file);  
     setSearchMode('upload');
     const { job_id } = await uploadCrawl(file, max);
     setJobId(job_id);
-    const t = setInterval(async () => {
+    // const t = setInterval(async () => {
+    //   const s = await getStatus(job_id);
+    //   setStatus(s);
+    //   if (s.status !== "running") { clearInterval(t); setLoading(false); }
+    // }, 1000);
+      const t = setInterval(async () => {
       const s = await getStatus(job_id);
       setStatus(s);
-      if (s.status !== "running") { clearInterval(t); setLoading(false); }
+      if (s.status !== "running") {
+        clearInterval(t);
+        setLoading(false);
+      }
     }, 1000);
   };
 
-  const canStart = (searchMode === 'text' ? kw.trim() : true) && !loading;
+  const canStart =
+  !loading &&
+  max >= 1 &&
+  max <= 500 &&
+  (searchMode === 'text' ? kw.trim().length > 0 : uploadFile !== null);
+
+  useEffect(() => {
+  setUploadFile(null);
+  setStatus({});
+  setJobId(null);
+  }, [searchMode]);
 
   return (
     <div className="app-container">
@@ -143,7 +171,7 @@ function App() {
             <input
               type="number"
               value={max}
-              onChange={(e) => setMax(Math.min(Number(e.target.value), 500))}
+              onChange={(e) => setMax(Math.min(Math.max(Number(e.target.value)), 500))}
               onFocus={() => setFocusedInput('max')}
               onBlur={() => setFocusedInput(null)}
               min="1"
